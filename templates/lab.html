@@ -54,22 +54,24 @@
         const socket = io();
 
         socket.on('connect', () => {
-            console.log('socket connected');
             socket.emit('join_lab', { lab_name: labName });
         });
 
         socket.on('shell_output', (data) => {
             const logBox = document.getElementById(`log-${data.role}`);
-            console.log(logBox)
             if (logBox) {
-                console.log(data)
-                logBox.textContent += data.output;
+                // clear 명령어 처리
+                if (data.clear) {
+                    logBox.textContent = data.output;
+                } else {
+                    logBox.textContent += data.output;
+                }
                 logBox.scrollTop = logBox.scrollHeight;
             }
         });
 
         socket.on('error', data => {
-            alert(data.msg);
+            console.error(data.error);
         });
     </script>
 </body>

@@ -6,11 +6,14 @@ from controllers.lab import lab_bp
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
 
+# SocketIO 초기화
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
+# 블루프린트 등록
 app.register_blueprint(main_bp)
 app.register_blueprint(lab_bp)
 
+# SocketIO 이벤트 핸들러
 @socketio.on('join_lab')
 def handle_join_lab(data):
     room = data['lab_name']

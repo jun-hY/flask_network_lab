@@ -11,7 +11,7 @@ services:
         volumes:
             - ./volumes:/volumes
         network_mode: host
-        command: bash -c "python3 /volumes/test.py"
+        command: bash -c "python3 /volumes/arp_spoof.py"
 
     hostA:
         image: handsonsecurity/seed-ubuntu:large
@@ -22,7 +22,7 @@ services:
         networks:
             net-10.9.0.0:
                 ipv4_address: 10.9.0.5
-        command: bash -c " /etc/init.d/openbsd-inetd start  && tail -f /dev/null "
+        command: bash -c "/etc/init.d/openbsd-inetd start && (while true; do clear; echo \"=== ARP Table ===\"; arp -n; echo \"=================\"; sleep 1; done)"
 
     hostB:
         image: handsonsecurity/seed-ubuntu:large
@@ -33,7 +33,7 @@ services:
         networks:
             net-10.9.0.0:
                 ipv4_address: 10.9.0.6
-        command: bash -c " /etc/init.d/openbsd-inetd start  && tail -f /dev/null "
+        command: bash -c "/etc/init.d/openbsd-inetd start  && tail -f /dev/null"
 
 networks:
     net-10.9.0.0:
