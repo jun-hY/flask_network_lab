@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_socketio import SocketIO, join_room
-from controllers.main import main_bp  # 👈 이렇게 직접 import
+from controllers.main import main_bp
 from controllers.lab import lab_bp
 
 app = Flask(__name__)

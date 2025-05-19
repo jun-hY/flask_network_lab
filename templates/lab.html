@@ -54,7 +54,8 @@
         const socket = io();
 
         socket.on('connect', () => {
-            console.log(socket.emit('join_lab', { lab_name: labName }))
+            console.log('socket connected');
+            socket.emit('join_lab', { lab_name: labName });
         });
 
         socket.on('shell_output', (data) => {
