@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Network Security Labs</title>
+</head>
+
+<body>
+    <h1>네트워크 보안 실습 목록</h1>
+    <ul>
+        {% for lab in labs %}
+        <li><a href="{{ lab.url }}">{{ lab.name }}</a></li>
+        {% endfor %}
+    </ul>
+
+</body>
+
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>{{ lab.name }}</title>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <!-- <script src="{{ url_for('static', filename='main.js') }}"></script> -->
+    <style>
+        .log-box {
+            width: 30%;
+            height: 400px;
+            border: 1px solid #ccc;
+            overflow-y: scroll;
+            float: left;
+            margin-right: 10px;
+            white-space: pre-wrap;
+            background-color: #222;
+            color: #0f0;
+            padding: 10px;
+            font-family: monospace;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: nowrap;
+        }
+
+        .controls {
+            clear: both;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>{{ lab.name }}</h1>
+
+    <form id="control-form" method="post" action="">
+        <button type="submit" formaction="{{ url_for('lab.start_lab', lab_name=lab.name) }}">실습 시작</button>
+        <button type="submit" formaction="{{ url_for('lab.stop_lab', lab_name=lab.name) }}">실습 종료</button>
+    </form>
+
+    <div class="container">
+        {% for role in lab.containers.keys() %}
+        <div class="log-box" id="log-{{ role }}">
+            <h3>{{ role.capitalize() }}</h3>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        const labName = "{{ lab.name }}";
+        const socket = io();
+
+        socket.on('connect', () => {
+            console.log(socket.emit('join_lab', { lab_name: labName }))
+        });
+
+        socket.on('shell_output', (data) => {
+            const logBox = document.getElementById(`log-${data.role}`);
+            console.log(logBox)
+            if (logBox) {
+                console.log(data)
+                logBox.textContent += data.output;
+                logBox.scrollTop = logBox.scrollHeight;
+            }
+        });
+
+        socket.on('error', data => {
+            alert(data.msg);
+        });
+    </script>
+</body>
+
+</html>
