@@ -5,7 +5,9 @@
     <meta charset="UTF-8" />
     <title>{{ lab.name }}</title>
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-    <!-- <script src="{{ url_for('static', filename='main.js') }}"></script> -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.1.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.7.0/lib/xterm-addon-fit.min.js"></script>
     <style>
         .container {
             display: flex;
@@ -28,15 +30,21 @@
             border-bottom: 1px solid #ddd;
         }
 
-        .log-content {
-            height: 300px;
-            overflow-y: auto;
+        .terminal-container {
             padding: 10px;
             background-color: #1e1e1e;
-            color: #f0f0f0;
-            font-family: 'Courier New', monospace;
-            white-space: pre-wrap;
-            word-break: break-all;
+            border-radius: 4px;
+        }
+
+        .terminal {
+            width: 100%;
+            height: 300px;
+            padding: 10px;
+        }
+
+        .xterm {
+            padding: 10px;
+            height: 100%;
         }
 
         .command-input {
@@ -86,11 +94,9 @@
         {% for role in lab.roles %}
         <div class="log-box" id="log-{{ role }}">
             <h3>{{ role }}</h3>
-            <div class="log-content" id="log-{{ role }}-content"></div>
-        </div>
-        <div class="command-input">
-            <input type="text" id="command-{{ role }}" placeholder="명령어를 입력하세요...">
-            <button onclick="sendCommand('{{ role }}')">실행</button>
+            <div class="terminal-container">
+                <div id="terminal-{{ role }}" class="terminal"></div>
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -98,49 +104,109 @@
     <script>
         const labName = "{{ lab.name }}";
         const socket = io();
+        const terminals = {};
+        const fitAddon = new FitAddon.FitAddon();
 
-        socket.on('connect', () => {
-            socket.emit('join_lab', { lab_name: labName });
-        });
+        // Initialize terminals
+        document.addEventListener('DOMContentLoaded', () => {
+            const roles = {{ lab.roles| tojson | safe
+        }};
 
-        socket.on('shell_output', (data) => {
-            const logBox = document.getElementById(`log-${data.role}-content`);
-            console.log(data);
-            if (logBox) {
-                // clear 명령어 처리
-                if (data.clear) {
-                    logBox.textContent = data.output;
-                } else {
-                    logBox.textContent += data.output;
-                }
-                logBox.scrollTop = logBox.scrollHeight;
-            }
-        });
+        // Connect to the lab room
+        socket.emit('join_lab', { lab_name: labName });
 
-        function sendCommand(role) {
-            const commandInput = document.getElementById(`command-${role}`);
-            const command = commandInput.value;
-            if (command) {
-                socket.emit('command', {
-                    lab_name: labName,
-                    role: role,
-                    command: command
-                });
-                commandInput.value = '';
-            }
-        }
+        // Initialize terminal for each role
+        roles.forEach(role => {
+            initTerminal(role);
 
-        // 엔터 키로 명령어 실행
-        document.querySelectorAll('.command-input input').forEach(input => {
-            input.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    sendCommand(e.target.id.replace('command-', ''));
-                }
+            // Start PTY session when the lab starts
+            socket.emit('start_pty', {
+                lab_name: labName,
+                role: role
             });
         });
 
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            Object.values(terminals).forEach(term => {
+                fitAddon.fit();
+
+                // Send new terminal size to server
+                const { rows, cols } = term;
+                socket.emit('pty_input', {
+                    resize: { rows, cols }
+                });
+            });
+        });
+        });
+
+        // Initialize xterm.js terminal
+        function initTerminal(role) {
+            const terminalContainer = document.getElementById(`terminal-${role}`);
+            const term = new Terminal({
+                cursorBlink: true,
+                fontFamily: 'Consolas, "Courier New", monospace',
+                fontSize: 14,
+                theme: {
+                    background: '#1e1e1e',
+                    foreground: '#f0f0f0'
+                }
+            });
+
+            // Add fit addon for responsive terminal
+            term.loadAddon(fitAddon);
+            term.open(terminalContainer);
+            fitAddon.fit();
+
+            // Handle terminal input
+            term.onData(data => {
+                socket.emit('pty_input', {
+                    role: role,
+                    input: data,
+                    lab_name: labName
+                });
+            });
+
+            // Store terminal instance
+            terminals[role] = term;
+
+            // Send initial terminal size
+            const { rows, cols } = term;
+            socket.emit('pty_input', {
+                role: role,
+                resize: { rows, cols },
+                lab_name: labName
+            });
+        }
+
+        // Handle PTY output
+        socket.on('pty_output', (data) => {
+            const term = terminals[data.role];
+            if (term) {
+                term.write(data.output);
+            }
+        });
+
+        // Handle errors
         socket.on('error', data => {
-            console.error(data.error);
+            console.error('Socket error:', data.error);
+            Object.values(terminals).forEach(term => {
+                term.writeln(`\r\n[ERROR] ${data.error}\r\n`);
+            });
+        });
+
+        // Handle disconnection
+        socket.on('disconnect', () => {
+            Object.values(terminals).forEach(term => {
+                term.writeln('\r\nDisconnected from server. Attempting to reconnect...\r\n');
+            });
+        });
+
+        // Handle reconnection
+        socket.on('reconnect', () => {
+            Object.values(terminals).forEach(term => {
+                term.writeln('\r\nReconnected to server.\r\n');
+            });
         });
     </script>
 </body>

@@ -34,7 +34,15 @@ def create_app(config_name='default'):
         return render_template('500.html'), 500
     
     # SocketIO 초기화
-    socketio = SocketIO(app, cors_allowed_origins="*")
+    socketio = SocketIO(
+        app,
+        cors_allowed_origins="*",
+        async_mode='eventlet',
+        logger=True,
+        engineio_logger=True,
+        ping_timeout=60,
+        ping_interval=25
+    )
     app.extensions['socketio'] = socketio
     
     # SocketIO 이벤트 핸들러 등록
@@ -45,16 +53,15 @@ def create_app(config_name='default'):
 # 애플리케이션 인스턴스 생성
 app, socketio = create_app()
 
-# SocketIO 이벤트 핸들러 등록은 여기서
-from controllers.lab import handle_command
-socketio.on_event('command', handle_command)
+# SocketIO 이벤트 핸들러 등록은 controllers/lab.py에서 수행됨
 
 @socketio.on('join_lab')
 def handle_join_lab(data):
     room = data.get('lab_name')
     from flask_socketio import join_room
     join_room(room)
-    print(f"Client joined room: {room}")
+    print(f"Client {request.sid} joined room: {room}")
+    return {'status': 'success'}
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, host="0.0.0.0", port=5000)
