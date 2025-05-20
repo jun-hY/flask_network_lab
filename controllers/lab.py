@@ -3,7 +3,6 @@ import json
 import select
 import socket
 import struct
-import fcntl
 import termios
 import tty
 import pty
@@ -16,6 +15,40 @@ from python_on_whales.exceptions import NoSuchContainer, DockerException
 import threading
 import time
 import logging
+
+# OS별 import 및 유틸리티 함수
+if os.name == 'nt':
+    import win32file
+    import win32con
+    import win32api
+    import msvcrt
+    
+    def set_nonblocking(fd):
+        msvcrt.setmode(fd, os.O_BINARY)
+    
+    def set_pty_size(fd, rows, cols):
+        # Windows에서는 pty 크기 조정이 제한적
+        pass
+    
+    def create_pty():
+        # Windows에서는 subprocess.PIPE 사용
+        return None, None
+else:
+    import fcntl
+    import termios
+    import tty
+    import pty
+    
+    def set_nonblocking(fd):
+        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+    
+    def set_pty_size(fd, rows, cols):
+        winsize = struct.pack('HHHH', rows, cols, 0, 0)
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
+    
+    def create_pty():
+        return pty.openpty()
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -36,7 +69,7 @@ running_threads = {}  # 실행 중인 로그 스트리밍 스레드: {role: thre
 global_docker = DockerClient()
 
 class DockerPTY:
-    """Docker 컨테이너와 상호작용하는 PTY 핸들러 (python-on-whales 버전)"""
+    """Docker 컨테이너와 상호작용하는 PTY 핸들러"""
     
     def __init__(self, container_id, socketio, room, role):
         self.container_id = container_id
@@ -53,44 +86,51 @@ class DockerPTY:
     def start(self):
         """PTY 세션 시작"""
         try:
-            # PTY 마스터/슬레이브 페어 생성
-            import pty
-            master_fd, slave_fd = pty.openpty()
-            
-            # 터미널 속성 설정
-            import termios
-            import tty
-            
-            # 원시 모드로 설정
-            tty.setraw(master_fd)
-            tty.setraw(slave_fd)
-            
-            # 터미널 크기 설정 (기본값: 80x24)
-            self._set_pty_size(master_fd, 24, 80)
-            
-            # Docker exec를 사용하여 PTY 세션 시작
-            self.process = self.docker.container.execute(
-                self.container_id,
-                ["/bin/bash", "--login", "-i"],
-                env={"TERM": "xterm-256color"},
-                tty=True,
-                stdin=slave_fd,
-                stdout=slave_fd,
-                stderr=slave_fd,
-                detach=True
-            )
-            
-            # 슬레이브는 이제 사용하지 않으므로 닫기
-            os.close(slave_fd)
-            
-            # 마스터 FD 저장
-            self.master_fd = master_fd
-            self.pty_fd = master_fd
+            if os.name == 'nt':
+                # Windows에서는 subprocess.Popen 사용
+                self.process = subprocess.Popen(
+                    ['docker', 'exec', '-it', self.container_id, '/bin/bash', '--login', '-i'],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True
+                )
+                self.master_fd = self.process.stdout.fileno()
+                self.pty_fd = self.process.stdin.fileno()
+            else:
+                # Linux/Unix에서는 pty 사용
+                master_fd, slave_fd = create_pty()
+                
+                # 터미널 속성 설정
+                tty.setraw(master_fd)
+                tty.setraw(slave_fd)
+                
+                # 터미널 크기 설정 (기본값: 80x24)
+                set_pty_size(master_fd, 24, 80)
+                
+                # Docker exec를 사용하여 PTY 세션 시작
+                self.process = self.docker.container.execute(
+                    self.container_id,
+                    ["/bin/bash", "--login", "-i"],
+                    env={"TERM": "xterm-256color"},
+                    tty=True,
+                    stdin=slave_fd,
+                    stdout=slave_fd,
+                    stderr=slave_fd,
+                    detach=True
+                )
+                
+                # 슬레이브는 이제 사용하지 않으므로 닫기
+                os.close(slave_fd)
+                
+                # 마스터 FD 저장
+                self.master_fd = master_fd
+                self.pty_fd = master_fd
             
             # 논블로킹 모드 설정
-            import fcntl
-            flags = fcntl.fcntl(self.master_fd, fcntl.F_GETFL)
-            fcntl.fcntl(self.master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+            set_nonblocking(self.master_fd)
             
             self.running = True
             self._start_reader()
@@ -108,15 +148,27 @@ class DockerPTY:
         def reader():
             while self.running and self.pty_fd is not None:
                 try:
-                    r, _, _ = select.select([self.pty_fd], [], [], 0.1)
-                    if self.pty_fd in r:
+                    if os.name == 'nt':
+                        # Windows에서는 select 대신 직접 읽기
                         try:
-                            data = os.read(self.pty_fd, 1024)
+                            data = os.read(self.master_fd, 1024)
                             if data:
                                 self.emit_output(data.decode('utf-8', 'replace'))
                         except (OSError, IOError) as e:
-                            if e.errno != 11:  # EAGAIN: 리소스 일시적으로 사용 불가
+                            if e.errno != 11:  # EAGAIN
                                 logger.error(f"읽기 오류: {str(e)}")
+                            time.sleep(0.1)
+                    else:
+                        # Linux/Unix에서는 select 사용
+                        r, _, _ = select.select([self.pty_fd], [], [], 0.1)
+                        if self.pty_fd in r:
+                            try:
+                                data = os.read(self.pty_fd, 1024)
+                                if data:
+                                    self.emit_output(data.decode('utf-8', 'replace'))
+                            except (OSError, IOError) as e:
+                                if e.errno != 11:  # EAGAIN
+                                    logger.error(f"읽기 오류: {str(e)}")
                                 time.sleep(0.1)
                 except Exception as e:
                     logger.error(f"읽기 스레드 오류: {str(e)}")
@@ -151,50 +203,17 @@ class DockerPTY:
             return
             
         try:
-            # 터미널 크기 설정
-            winsize = struct.pack('HHHH', rows, cols, 0, 0)
-            fcntl.ioctl(self.pty_fd, termios.TIOCSWINSZ, winsize)
-            
-            # Docker 컨테이너의 pty 크기 조정
-            if hasattr(self, 'process') and self.process:
-                self.docker.container.execute(
-                    self.container_id,
-                    ["stty", "rows", str(rows), "cols", str(cols)]
-                )
+            if os.name != 'nt':  # Windows에서는 크기 조정 지원 안 함
+                set_pty_size(self.pty_fd, rows, cols)
                 
+                # Docker 컨테이너의 pty 크기 조정
+                if hasattr(self, 'process') and self.process:
+                    self.docker.container.execute(
+                        self.container_id,
+                        ["stty", "rows", str(rows), "cols", str(cols)]
+                    )
         except Exception as e:
             logger.error(f"터미널 크기 조정 오류: {str(e)}")
-    
-    def _set_pty_size(self, fd, rows, cols):
-        """PTY 크기 설정"""
-        import fcntl
-        import struct
-        import termios
-        
-        # 터미널 크기 설정
-        winsize = struct.pack('HHHH', rows, cols, 0, 0)
-        fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
-        
-        # Docker 컨테이너의 pty 크기 조정
-        if hasattr(self, 'process') and self.process:
-            try:
-                self.docker.container.execute(
-                    self.container_id,
-                    ["stty", "rows", str(rows), "cols", str(cols)],
-                    tty=True
-                )
-            except Exception as e:
-                logger.error(f"터미널 크기 조정 중 오류: {e}")
-    
-    def resize(self, rows, cols):
-        """터미널 크기 조정"""
-        if not self.running or not hasattr(self, 'master_fd') or self.master_fd is None:
-            return
-        
-        try:
-            self._set_pty_size(self.master_fd, rows, cols)
-        except Exception as e:
-            logger.error(f"터미널 크기 조정 오류: {e}")
     
     def stop(self):
         """PTY 세션 정리"""
@@ -202,6 +221,16 @@ class DockerPTY:
             return
             
         self.running = False
+        
+        # 프로세스 정리
+        if hasattr(self, 'process') and self.process:
+            try:
+                if os.name == 'nt':
+                    self.process.terminate()
+                else:
+                    os.kill(self.process.pid, 9)
+            except Exception as e:
+                logger.error(f"프로세스 종료 오류: {str(e)}")
         
         # 파일 디스크립터 정리
         if hasattr(self, 'master_fd') and self.master_fd is not None:
@@ -226,17 +255,6 @@ class DockerPTY:
                     logger.warning("리더 스레드가 제시간에 종료되지 않았습니다.")
             except Exception as e:
                 logger.error(f"리더 스레드 종료 대기 중 오류: {e}")
-        
-        # Docker 컨테이너 정리
-        if hasattr(self, 'process') and self.process:
-            try:
-                self.process.kill()
-                self.process.remove(force=True)
-            except Exception as e:
-                logger.error(f"Docker 컨테이너 정리 중 오류: {e}")
-            self.process = None
-        
-        logger.debug("PTY 세션이 정상적으로 정리되었습니다.")
 
 def get_lab_config(lab_name):
     """랩 환경 설정을 가져옵니다."""

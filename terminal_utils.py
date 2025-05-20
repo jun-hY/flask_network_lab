@@ -2,6 +2,7 @@ import os
 import pty
 import select
 import fcntl
+import struct
 import tty
 import termios
 import subprocess

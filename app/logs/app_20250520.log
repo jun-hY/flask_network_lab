@@ -1,0 +1,22 @@
+[2025-05-20 18:07:11,875] ERROR in docker_service: Docker 서비스 연결 실패: The command executed was `C:\Program Files\Docker\Docker\resources\bin\docker.EXE version -f {{json .}}`.
+It returned with code 1
+The content of stdout is '{"Client":{"Version":"28.1.1","ApiVersion":"1.49","DefaultAPIVersion":"1.49","GitCommit":"4eba377","GoVersion":"go1.23.8","Os":"windows","Arch":"amd64","BuildTime":"Fri Apr 18 09:53:24 2025","Context":"desktop-linux"},"Server":null}
+'
+The content of stderr is 'error during connect: Get "http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.49/version": open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.
+'
+
+[2025-05-20 18:07:11,875] ERROR in docker_service: Docker 서비스 연결 실패: The command executed was `C:\Program Files\Docker\Docker\resources\bin\docker.EXE version -f {{json .}}`.
+It returned with code 1
+The content of stdout is '{"Client":{"Version":"28.1.1","ApiVersion":"1.49","DefaultAPIVersion":"1.49","GitCommit":"4eba377","GoVersion":"go1.23.8","Os":"windows","Arch":"amd64","BuildTime":"Fri Apr 18 09:53:24 2025","Context":"desktop-linux"},"Server":null}
+'
+The content of stderr is 'error during connect: Get "http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.49/version": open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.
+'
+
+[2025-05-20 18:08:43,825] INFO in docker_service: Docker 서비스 연결 성공
+[2025-05-20 18:08:43,825] INFO in docker_service: Docker 서비스 연결 성공
+[2025-05-20 18:11:15,640] INFO in docker_service: Docker 서비스 연결 성공
+[2025-05-20 18:11:15,640] INFO in docker_service: Docker 서비스 연결 성공
+[2025-05-20 18:14:38,122] INFO in docker_service: Docker 서비스 연결 성공
+[2025-05-20 18:14:38,122] INFO in docker_service: Docker 서비스 연결 성공
+[2025-05-20 18:30:41,508] INFO in docker_service: Docker 서비스 연결 성공
+[2025-05-20 18:30:41,508] INFO in docker_service: Docker 서비스 연결 성공

@@ -1,62 +1,42 @@
-LABS = [
-    {'name': 'MITM Attack', 'url': '/lab/mitm'},
-    {'name': 'ARP Spoofing', 'url': '/lab/arp'},
-    {'name': 'DNS Spoofing', 'url': '/lab/dns'},
-    {'name': 'ICMP Redirect', 'url': '/lab/icmp'},
-    {'name': 'MAC Flooding', 'url': '/lab/mac'},
-    {'name': 'DHCP Starvation', 'url': '/lab/dhcp'},
-]
-
-LAB_CONFIG = {
-    "arp": {
-        "roles": {
-            "attacker": {
-                "name": "Attacker",
-                "description": "공격자 역할"
-            },
-            "hostA": {
-                "name": "Host A",
-                "description": "타겟 호스트 A"
-            },
-            "hostB": {
-                "name": "Host B",
-                "description": "타겟 호스트 B"
-            }
-        }
-    }
-}
+"""
+Flask Network Lab 기본 설정 파일
+"""
 
 import os
+import secrets
 from pathlib import Path
 
 # 기본 경로 설정
 BASE_DIR = Path(__file__).parent
 DOCKER_COMPOSE_DIR = BASE_DIR / "Docker"
 
-# Docker 관련 설정
-DOCKER_CONFIG = {
-    "compose_dir": "Docker",
-    "container_names": {
-        "attacker": "seed-attacker",
-        "hostA": "hostA-10.9.0.5",
-        "hostB": "hostB-10.9.0.6"
+# Flask 설정
+SECRET_KEY = os.getenv('SECRET_KEY', secrets.token_hex(32))
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+
+# 랩 환경 설정
+LAB_CONFIG = {
+    'basic_network': {
+        'roles': ['router1', 'router2', 'host1', 'host2'],
+        'description': '기본 네트워크 구성 실습'
     },
-    "networks": ["net-10.9.0.0"],
-    "subnet": "10.9.0.0/24"
+    'ospf_network': {
+        'roles': ['router1', 'router2', 'router3', 'host1', 'host2'],
+        'description': 'OSPF 라우팅 프로토콜 실습'
+    }
 }
 
-# 랩 환경별 설정
-LAB_CONFIG = {
-    "arp": {
-        "name": "ARP Spoofing Lab",
-        "description": "ARP 스푸핑 공격 실습 환경. attacker 에서 python3 /volumes/arp_spoof.py 를 실행해보세요! hostA에선 arp -n을 실행해보세요!",
-        "roles": ["attacker", "hostA", "hostB"],
-        "docker_compose": "docker-compose-arp.yml",
-        "volumes": {
-            "arp_spoof": "/volumes/arp_spoof.py"
-        }
+# Docker 설정
+DOCKER_CONFIG = {
+    'container_names': {
+        'router1': 'router1',
+        'router2': 'router2',
+        'router3': 'router3',
+        'host1': 'host1',
+        'host2': 'host2'
     },
-    # 추가 랩 환경을 여기에 정의할 수 있습니다.
+    'image': 'network_lab:latest',
+    'network_name': 'network_lab_net'
 }
 
 # 로그 설정
@@ -68,7 +48,7 @@ LOG_CONFIG = {
 
 # Flask 앱 설정
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-123'
+    SECRET_KEY = SECRET_KEY
     DOCKER_COMPOSE_DIR = str(DOCKER_COMPOSE_DIR)
     
     @staticmethod

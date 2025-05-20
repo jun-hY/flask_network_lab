@@ -1,67 +1,64 @@
-from flask import Flask, render_template
-from flask_socketio import SocketIO
-from config import config, DOCKER_COMPOSE_DIR, LAB_CONFIG, DOCKER_CONFIG
+"""
+Flask Network Lab 메인 실행 파일
+"""
 
-def create_app(config_name='default'):
-    """Flask 애플리케이션 팩토리 함수"""
+import os
+from flask import Flask
+from flask_socketio import SocketIO
+from app.config.settings import Settings
+from app.utils.logging import setup_logging
+from app.services.docker_service import DockerService
+from app.services.session_service import SessionService
+from app.exceptions.custom_exceptions import ConfigError
+
+def create_app():
+    """Flask 애플리케이션을 생성합니다."""
     app = Flask(__name__)
     
     # 설정 로드
-    app.config.from_object(config[config_name])
-    config[config_name].init_app(app)
+    settings = Settings()
+    app.config.from_object(settings)
     
-    # 커스텀 설정
-    app.config.update({
-        'DOCKER_COMPOSE_DIR': DOCKER_COMPOSE_DIR,
-        'LAB_CONFIG': LAB_CONFIG,
-        'DOCKER_CONFIG': DOCKER_CONFIG
-    })
+    # 로깅 설정
+    logger = setup_logging(app)
     
-    # 블루프린트 등록
-    from controllers.main import main_bp
-    from controllers.lab import lab_bp, register_socketio_handlers
+    # 서비스 초기화
+    docker_service = DockerService()
+    session_service = SessionService()
     
-    app.register_blueprint(main_bp)
-    app.register_blueprint(lab_bp)
-    
-    # 에러 핸들러
-    @app.errorhandler(404)
-    def page_not_found(e):
-        return render_template('404.html'), 404
-    
-    @app.errorhandler(500)
-    def internal_server_error(e):
-        return render_template('500.html'), 500
+    # 서비스를 앱 컨텍스트에 저장
+    app.docker_service = docker_service
+    app.session_service = session_service
     
     # SocketIO 초기화
-    socketio = SocketIO(
-        app,
-        cors_allowed_origins="*",
-        async_mode='eventlet',
-        logger=True,
-        engineio_logger=True,
-        ping_timeout=60,
-        ping_interval=25
-    )
-    app.extensions['socketio'] = socketio
+    socketio = SocketIO(app, cors_allowed_origins="*")
+    app.socketio = socketio
+    
+    # 블루프린트 등록
+    from app.controllers.lab import lab_bp
+    app.register_blueprint(lab_bp)
     
     # SocketIO 이벤트 핸들러 등록
+    from app.controllers.lab import register_socketio_handlers
     register_socketio_handlers(socketio)
     
     return app, socketio
 
-# 애플리케이션 인스턴스 생성
-app, socketio = create_app()
-
-# SocketIO 이벤트 핸들러 등록은 controllers/lab.py에서 수행됨
-
-@socketio.on('join_lab')
-def handle_join_lab(data):
-    room = data.get('lab_name')
-    from flask_socketio import join_room
-    join_room(room)
-    print(f"Client {request.sid} joined room: {room}")
-    return {'status': 'success'}
+def main():
+    """애플리케이션을 실행합니다."""
+    app, socketio = create_app()
+    
+    try:
+        socketio.run(
+            app,
+            host='0.0.0.0',
+            port=5000,
+            debug=app.config.get('DEBUG', False),
+            use_reloader=False
+        )
+    except Exception as e:
+        app.logger.error(f"애플리케이션 실행 중 오류 발생: {str(e)}")
+        raise
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host="0.0.0.0", port=5000)
+    main()

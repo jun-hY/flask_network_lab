@@ -106,38 +106,36 @@
         const socket = io();
         const terminals = {};
         const fitAddon = new FitAddon.FitAddon();
+        const roles = {{ lab.roles | tojson | safe }};
 
         // Initialize terminals
         document.addEventListener('DOMContentLoaded', () => {
-            const roles = {{ lab.roles| tojson | safe
-        }};
+            // Connect to the lab room 
+            socket.emit('join_lab', { lab_name: labName });
 
-        // Connect to the lab room
-        socket.emit('join_lab', { lab_name: labName });
+            // Initialize terminal for each role
+            roles.forEach(role => {
+                initTerminal(role);
 
-        // Initialize terminal for each role
-        roles.forEach(role => {
-            initTerminal(role);
-
-            // Start PTY session when the lab starts
-            socket.emit('start_pty', {
-                lab_name: labName,
-                role: role
-            });
-        });
-
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            Object.values(terminals).forEach(term => {
-                fitAddon.fit();
-
-                // Send new terminal size to server
-                const { rows, cols } = term;
-                socket.emit('pty_input', {
-                    resize: { rows, cols }
+                // Start PTY session when the lab starts
+                socket.emit('start_pty', {
+                    lab_name: labName,
+                    role: role
                 });
             });
-        });
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                Object.values(terminals).forEach(term => {
+                    fitAddon.fit();
+
+                    // Send new terminal size to server
+                    const { rows, cols } = term;
+                    socket.emit('pty_input', {
+                        resize: { rows, cols }
+                    });
+                });
+            });
         });
 
         // Initialize xterm.js terminal
