@@ -3,40 +3,33 @@ Flask Network Lab 기본 설정 파일
 """
 
 import os
-import secrets
 from pathlib import Path
+
 
 # 기본 경로 설정
 BASE_DIR = Path(__file__).parent
 DOCKER_COMPOSE_DIR = BASE_DIR / "Docker"
 
 # Flask 설정
-SECRET_KEY = os.getenv('SECRET_KEY', secrets.token_hex(32))
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
+DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
 # 랩 환경 설정
 LAB_CONFIG = {
-    'basic_network': {
-        'roles': ['router1', 'router2', 'host1', 'host2'],
-        'description': '기본 네트워크 구성 실습'
+    'arp_poisoning': {
+        'description': """ARP Cache Poisoning 실습 환경
+<p>1.</p>
+<p>2.</p>
+<p>3.</p>
+        """,
+        'roles': ['HostA', 'HostB', 'HostM'],
     },
-    'ospf_network': {
-        'roles': ['router1', 'router2', 'router3', 'host1', 'host2'],
-        'description': 'OSPF 라우팅 프로토콜 실습'
-    }
-}
+    'sniffing_spoofing': {
+        'description': """ARP Spoofing을 이용한 패킷 스니핑 실습 환경
 
-# Docker 설정
-DOCKER_CONFIG = {
-    'container_names': {
-        'router1': 'router1',
-        'router2': 'router2',
-        'router3': 'router3',
-        'host1': 'host1',
-        'host2': 'host2'
-    },
-    'image': 'network_lab:latest',
-    'network_name': 'network_lab_net'
+        """,
+        'roles': ['attacker', 'hostA', 'hostB'],
+    }
 }
 
 # 로그 설정

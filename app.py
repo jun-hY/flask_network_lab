@@ -1,64 +1,67 @@
-"""
-Flask Network Lab 메인 실행 파일
-"""
+from flask import Flask, render_template, jsonify
+from config import DOCKER_COMPOSE_DIR, LAB_CONFIG
+from python_on_whales import DockerClient
+import time
 
-import os
-from flask import Flask
-from flask_socketio import SocketIO
-from app.config.settings import Settings
-from app.utils.logging import setup_logging
-from app.services.docker_service import DockerService
-from app.services.session_service import SessionService
-from app.exceptions.custom_exceptions import ConfigError
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'secret!'
 
-def create_app():
-    """Flask 애플리케이션을 생성합니다."""
-    app = Flask(__name__)
-    
-    # 설정 로드
-    settings = Settings()
-    app.config.from_object(settings)
-    
-    # 로깅 설정
-    logger = setup_logging(app)
-    
-    # 서비스 초기화
-    docker_service = DockerService()
-    session_service = SessionService()
-    
-    # 서비스를 앱 컨텍스트에 저장
-    app.docker_service = docker_service
-    app.session_service = session_service
-    
-    # SocketIO 초기화
-    socketio = SocketIO(app, cors_allowed_origins="*")
-    app.socketio = socketio
-    
-    # 블루프린트 등록
-    from app.controllers.lab import lab_bp
-    app.register_blueprint(lab_bp)
-    
-    # SocketIO 이벤트 핸들러 등록
-    from app.controllers.lab import register_socketio_handlers
-    register_socketio_handlers(socketio)
-    
-    return app, socketio
+# 메인 페이지 라우트
+@app.route('/')
+def index():
+    labs = []
+    for lab_name, config in LAB_CONFIG.items():
+        lab_info = {
+            'name': lab_name,
+            'description': config['description'],
+            'roles': config['roles'],
+        }
+        
+        labs.append(lab_info)
+    return render_template('index.html', labs=labs)
 
-def main():
-    """애플리케이션을 실행합니다."""
-    app, socketio = create_app()
+@app.route('/up/<lab_name>', methods=['POST'])
+def up(lab_name):
+    if lab_name not in LAB_CONFIG:
+        return jsonify({'error': '실습 항목을 찾을 수 없습니다.'}), 404
     
-    try:
-        socketio.run(
-            app,
-            host='0.0.0.0',
-            port=5000,
-            debug=app.config.get('DEBUG', False),
-            use_reloader=False
-        )
-    except Exception as e:
-        app.logger.error(f"애플리케이션 실행 중 오류 발생: {str(e)}")
-        raise
+    config = LAB_CONFIG[lab_name]
+    
+    compose_file = DOCKER_COMPOSE_DIR / f"docker-compose-{lab_name}.yml"
+    if not compose_file.exists():
+        return jsonify({'error': 'docker-compose 파일을 찾을 수 없습니다.'}), 404
+    
+    docker = DockerClient(compose_files=[compose_file])
+    docker.compose.up(
+        detach=True
+    )
+    start_time = time.time()
+    
+    while (start_time + 60 > time.time()):
+        cnt = 0
+        for role in config['roles']:
+            if 'spawned: \'shellinabox\'' in docker.compose.logs(role):
+                cnt += 1
+        if cnt == len(config['roles']):
+            break
+        time.sleep(.2)
+
+    return jsonify({'message': '랩 환경이 시작되었습니다.', 'description': config['description']})
+
+@app.route('/down/<lab_name>', methods=['DELETE'])
+def down(lab_name):
+    if lab_name not in LAB_CONFIG:
+        return jsonify({'error': '실습 항목을 찾을 수 없습니다.'}), 404
+    
+    compose_file = DOCKER_COMPOSE_DIR / f"docker-compose-{lab_name}.yml"
+    if not compose_file.exists():
+        return jsonify({'error': 'docker-compose 파일을 찾을 수 없습니다.'}), 404
+    
+    docker = DockerClient(compose_files=[compose_file])
+    docker.compose.down()
+    
+    return jsonify({'message': '랩 환경이 종료되었습니다.'})
 
 if __name__ == '__main__':
-    main()
+    print('서버 시작: http://localhost:5000')
+    app.run(debug=True)
