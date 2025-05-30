@@ -5,7 +5,6 @@ Flask Network Lab 기본 설정 파일
 import os
 from pathlib import Path
 
-
 # 기본 경로 설정
 BASE_DIR = Path(__file__).parent
 DOCKER_COMPOSE_DIR = BASE_DIR / "Docker"
@@ -17,10 +16,11 @@ DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 # 랩 환경 설정
 LAB_CONFIG = {
     'arp_poisoning': {
-        'description': """ARP Cache Poisoning 실습 환경
-<p>1.</p>
-<p>2.</p>
-<p>3.</p>
+        'description': """ARP Cache Poisoning 실습 환경 
+<p>1. 공격 타겟의 호스트에서 ping 10.9.0.99 를 실행해 arp 테이블에 10.9.0.99에 대한 정보를 등록합니다.</p>
+<p>2. 공격 타겟에서 ifconfig 명령어를 실행해 공격 타겟의 MAC 주소를 확인합니다.</p>
+<p>3. 공격자에서 python3 volumes/arp_cache_poisoning.py를 실행하고 공격 타겟의 MAC 주소를 입력합니다.</p>
+<p>4. 공격 타겟의 호스트에서 arp -n 명령어로 arp 테이블이 수정되었는지 확인합니다.</p>
         """,
         'roles': ['HostA', 'HostB', 'HostM'],
     },

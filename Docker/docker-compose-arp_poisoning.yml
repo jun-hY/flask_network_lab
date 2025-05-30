@@ -45,7 +45,7 @@ services:
         privileged: true
         volumes:
             - ./init.sh:/init.sh
-            - ./volumes:/volumes
+            - ./volumes/arp_cache_poisoning:/volumes
         networks:
             net-10.9.0.0:
                 ipv4_address: 10.9.0.105

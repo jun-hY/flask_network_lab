@@ -1,5 +1,5 @@
 from flask import Flask, render_template, jsonify
-from config import DOCKER_COMPOSE_DIR, LAB_CONFIG
+from config import BASE_DIR, DOCKER_COMPOSE_DIR, LAB_CONFIG
 from python_on_whales import DockerClient
 import time
 
