@@ -1,58 +1,59 @@
 version: "3"
 
 services:
-    attacker:
+    HostA:
         image: handsonsecurity/seed-ubuntu:large
-        container_name: seed-attacker
+        container_name: A-10.9.0.5
+        hostname: Server
         tty: true
-        cap_add:
-            - ALL
-        privileged: true
-        ports:
-            - "4200:4200"
-        volumes:
-            - ./volumes:/volumes
-            - ./init.sh:/init.sh
-        hostname: attacker
-        networks:
-            net-10.9.0.0:
-                ipv4_address: 10.9.0.105
-        command: /init.sh
-
-    hostA:
-        image: handsonsecurity/seed-ubuntu:large
-        container_name: hostA-10.9.0.5
-        tty: true
-        cap_add:
-            - ALL
-        volumes:
-            - ./init.sh:/init.sh
         ports:
             - "4201:4200"
-        hostname: hostA
+        cap_add:
+            - ALL
+        volumes:
+            - ./init.sh:/init.sh
         networks:
             net-10.9.0.0:
                 ipv4_address: 10.9.0.5
         command: bash -c "/etc/init.d/openbsd-inetd start && /init.sh && tail -f /dev/null"
 
-    hostB:
+    HostB:
         image: handsonsecurity/seed-ubuntu:large
-        container_name: hostB-10.9.0.6
+        container_name: B-10.9.0.6
+        hostname: Client
         tty: true
-        cap_add:
-            - ALL
         ports:
             - "4202:4200"
+        cap_add:
+            - ALL
         volumes:
             - ./init.sh:/init.sh
-        hostname: hostB
         networks:
             net-10.9.0.0:
                 ipv4_address: 10.9.0.6
         command: bash -c "/etc/init.d/openbsd-inetd start && /init.sh && tail -f /dev/null"
 
+    HostM:
+        image: handsonsecurity/seed-ubuntu:large
+        container_name: M-10.9.0.105
+        hostname: Middle
+        tty: true
+        ports:
+            - "4200:4200"
+        cap_add:
+            - ALL
+        privileged: true
+        volumes:
+            - ./init.sh:/init.sh
+            - ./volumes/mitm:/volumes
+        networks:
+            net-10.9.0.0:
+                ipv4_address: 10.9.0.105
+        command: /init.sh
+
 networks:
     net-10.9.0.0:
+        name: net-10.9.0.0
         ipam:
             config:
                 - subnet: 10.9.0.0/24

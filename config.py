@@ -24,11 +24,19 @@ LAB_CONFIG = {
         """,
         'roles': ['HostA', 'HostB', 'HostM'],
     },
-    'sniffing_spoofing': {
-        'description': """ARP Spoofing을 이용한 패킷 스니핑 실습 환경
-
+    'mitm': {
+        'description': """Man In The Middle 실습 환경
+<p>1. 공격 머신에서 python3 volumes/mitm_tcp.py를 실행합니다.</p>
+<p>2. 타겟 머신(hostA, hostB)들에서 ifconfig를 사용하여 공격 타겟의 MAC 주소를 확인합니다.</p>
+<p>3. 공격 머신에 타겟의 MAC 주소를 입력합니다.</p>
+<p>4. 타겟 머신 중 하나에서 telnet [다른 타겟 IP]를 실행합니다.</p>
+<p>5. 공격 머신에서 sysctl net.ipv4.ip_forward=0를 실행합니다.</p>
+<p>6. 공격 머신에서 다시 python3 volumes/mitm_tcp.py를 실행합니다.(MAC 주소 입력도 다시하세요)</p>
+<p>7. telnet을 실행한 머신에서 아무 키를 입력합니다.</p>
+<p>8. 공격 머신에서 타겟 머신에 입력한 키가 표시되는 지 확인합니다.</p>
+<p>9. telnet을 실행한 타겟 머신에서 입력이 ZZ로 바뀌었다면 성공입니다!</p>
         """,
-        'roles': ['attacker', 'hostA', 'hostB'],
+        'roles': ['HostA', 'HostB', 'HostM'],
     }
 }
 
