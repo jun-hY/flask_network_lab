@@ -39,36 +39,3 @@ LAB_CONFIG = {
         'roles': ['HostA', 'HostB', 'HostM'],
     }
 }
-
-# 로그 설정
-LOG_CONFIG = {
-    "level": "INFO",
-    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    "file": "app.log"
-}
-
-# Flask 앱 설정
-class Config:
-    SECRET_KEY = SECRET_KEY
-    DOCKER_COMPOSE_DIR = str(DOCKER_COMPOSE_DIR)
-    
-    @staticmethod
-    def init_app(app):
-        pass
-
-# 개발 환경 설정
-class DevelopmentConfig(Config):
-    DEBUG = True
-    LOG_LEVEL = "DEBUG"
-
-# 프로덕션 환경 설정
-class ProductionConfig(Config):
-    DEBUG = False
-    LOG_LEVEL = "WARNING"
-
-# 환경별 설정 매핑
-config = {
-    'development': DevelopmentConfig,
-    'production': ProductionConfig,
-    'default': DevelopmentConfig
-}
