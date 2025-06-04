@@ -13,14 +13,18 @@ if %ERRORLEVEL% NEQ 0 (
     ECHO winget을 사용하여 Python 3.11 설치
     winget install -e --id Python.Python.3.11
     
-    ECHO 설치 확인
-    %LOCALAPPDATA%\Programs\Python\Python311\python.exe --version 2>nul
-    if %ERRORLEVEL% NEQ 0 (
+    ECHO Python 3.11 버전 설치 확인
+    %LOCALAPPDATA%\Programs\Python\Python311\python.exe --version >nul 2>&1
+    if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
+        echo [INFO] Python 3.11이 성공적으로 설치되었습니다.
+        echo [INFO] 배치 파일을 다시 실행합니다...
+        call "%~f0"
+        exit /b
+    ) else (
         echo [ERROR] Python 3.11 설치에 실패했습니다. 수동으로 설치해주세요.
         pause
         exit /b 1
     )
-    echo [INFO] Python 3.11이 성공적으로 설치되었습니다.
 )
 
 ECHO 가상환경이 없으면 생성
